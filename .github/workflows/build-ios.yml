@@ -1,0 +1,38 @@
+name: Build keyboard fix IPA
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: keyboard-fix-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Show Xcode version
+        run: xcodebuild -version
+      - name: Verify navigation lifecycle
+        run: |
+          swiftc ios/MotoNav/ArrivalPolicy.swift ios/tests/arrival/main.swift -o /tmp/arrival
+          /tmp/arrival
+          swiftc ios/MotoNav/ArrivalPolicy.swift ios/MotoNav/NaviSessionCallbacks.swift ios/tests/arrival-relay/SDKStubs.swift ios/tests/arrival-relay/main.swift -o /tmp/arrival-relay
+          /tmp/arrival-relay
+      - name: Install locked iOS dependencies
+        working-directory: ios
+        run: |
+          sudo gem install cocoapods -v 1.17.0 --no-document
+          pod _1.17.0_ install --deployment
+      - name: Build unsigned iPhone IPA
+        run: bash scripts/build-ios-ipa.sh
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: MotoNav-0.15.3-keyboard-fix-unsigned
+          path: output/ios/
+          if-no-files-found: error
+          retention-days: 30
